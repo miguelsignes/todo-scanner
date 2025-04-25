@@ -1,25 +1,61 @@
-# TODO Scanner
+# TODO Scanner 🚀
 
-Extensión para VS Code que escanea automáticamente todos los archivos de tu proyecto en busca de comentarios tipo `TODO:`, `FIXME:`, `HACK:`, y los muestra en una vista lateral interactiva.
+VS Code extension to automatically scan your project for:
 
-![Preview](display.png)
+- `// TODO:`
+- `// FIXME:`
+- `// HACK:`
 
-## Características
+And display them in a beautiful sidebar panel.
 
-- Escanea archivos `.ts`, `.js`, `.html`, `.scss`.
-- Vista lateral fija en la barra izquierda.
-- Actualización automática al guardar archivos.
-- Navegación directa al archivo y línea desde la lista.
+---
 
-## Comandos
+## ✨ Features
 
-- `Mostrar TODOs`: escanea manualmente el proyecto (útil si cierras la vista).
+- ✅ Sidebar panel with grouped TODOs by file
+- 🎨 Color coding for `TODO`, `FIXME`, and `HACK`
+- 🔍 Click any TODO to jump to its location
+- ☑️ Mark as "done" (checkbox)
+- ✂️ Automatically deletes the TODO comment when marked as done
+- 💾 Remembers which TODOs were marked as done between sessions
+- ⚡ Auto-refreshes on file save
 
-## Instalación manual
+---
 
-1. Ejecuta `vsce package`.
-2. Instala el `.vsix` con `code --install-extension nombre.vsix`.
+## 📸 Preview
 
-## Licencia
+> Coming soon...
 
-MIT
+---
+
+## 🔧 Usage
+
+1. Open a project with `TODO`, `FIXME`, or `HACK` comments
+2. Open the **TODO Scanner** sidebar from the Activity Bar
+3. Click to jump, check to mark as done (and auto-delete the comment!)
+
+---
+
+## 🛠 Development
+
+```bash
+npm install
+npm run compile
+vsce package
+code --install-extension todo-scanner-0.0.1.vsix --force
+```
+
+---
+
+## 📤 Publishing (for maintainers)
+
+```bash
+vsce login <publisher>
+vsce publish patch|minor|major
+```
+
+---
+
+## 📄 License
+
+MIT © Miguel Signes
