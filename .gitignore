@@ -1,0 +1,21 @@
+# Node.js
+node_modules/
+dist/
+out/
+
+# VS Code
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Compilación
+*.tsbuildinfo
+
+# VSCE package
+*.vsix
