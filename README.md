@@ -1,13 +1,25 @@
 # TODO Scanner
 
-Una extensión de VS Code que escanea todos los archivos del proyecto en busca de comentarios tipo TODO, FIXME o HACK, y los muestra en una ventana lateral con navegación rápida.
+Extensión para VS Code que escanea automáticamente todos los archivos de tu proyecto en busca de comentarios tipo `TODO:`, `FIXME:`, `HACK:`, y los muestra en una vista lateral interactiva.
 
-## Uso
+![Preview](display.png)
 
-- Al abrir un proyecto, se escanean todos los archivos `.ts`, `.js`, `.html`, `.scss`.
-- Los comentarios tipo `// TODO:`, `// FIXME:` o `// HACK:` aparecen en un panel lateral.
-- Haz clic en cualquier entrada para ir directamente a la línea correspondiente.
+## Características
 
-## Comando
+- Escanea archivos `.ts`, `.js`, `.html`, `.scss`.
+- Vista lateral fija en la barra izquierda.
+- Actualización automática al guardar archivos.
+- Navegación directa al archivo y línea desde la lista.
 
-- `Mostrar TODOs`: escanea el proyecto y muestra la lista de tareas pendientes.
+## Comandos
+
+- `Mostrar TODOs`: escanea manualmente el proyecto (útil si cierras la vista).
+
+## Instalación manual
+
+1. Ejecuta `vsce package`.
+2. Instala el `.vsix` con `code --install-extension nombre.vsix`.
+
+## Licencia
+
+MIT
