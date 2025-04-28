@@ -3,10 +3,12 @@
   "displayName": "%todoScanner.title%",
   "description": "Scan and manage TODO, FIXME, HACK, and IDEA comments efficiently.",
   "publisher": "miguelsignes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "engines": {
     "vscode": "^1.99.0"
   },
+  "icon": "media/icon.png",
+  
   "categories": [
     "Other"
   ],
