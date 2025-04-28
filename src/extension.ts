@@ -1,23 +1,11 @@
-// src/extension.ts
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface TodoItem {
-  file: string;
-  line: number;
-  tag: string;
-  text: string;
-  done?: boolean;
-}
-
-let savedState: Record<string, boolean> = {};
+let viewProvider: TodoViewProvider | null = null;
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('[TODO Scanner] Activando extensión...');
-  const viewProvider = new TodoViewProvider(context.extensionUri, context);
-
-  savedState = context.globalState.get<Record<string, boolean>>('todoScanner.done') || {};
+  viewProvider = new TodoViewProvider(context.extensionUri, context.globalState);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('todoScannerView', viewProvider)
@@ -25,27 +13,28 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('todoScanner.showTodos', async () => {
-      await vscode.commands.executeCommand('workbench.view.extension.todoScanner');
-      await viewProvider.refresh();
+      await viewProvider?.refresh();
     })
   );
 
-  context.subscriptions.push(
-    vscode.workspace.onDidSaveTextDocument(async () => {
-      await viewProvider.refresh();
-    })
-  );
-
-  viewProvider.refresh();
+  vscode.workspace.onDidSaveTextDocument(async () => {
+    await viewProvider?.refresh();
+  });
 }
+
+export function deactivate() {}
 
 class TodoViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
+  private _extensionUri: vscode.Uri;
+  private _state: vscode.Memento;
+  private doneKeys = new Set<string>();
 
-  constructor(
-    private readonly extensionUri: vscode.Uri,
-    private readonly context: vscode.ExtensionContext
-  ) {}
+  constructor(extensionUri: vscode.Uri, globalState: vscode.Memento) {
+    this._extensionUri = extensionUri;
+    this._state = globalState;
+    this.loadDone();
+  }
 
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -53,11 +42,7 @@ class TodoViewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ) {
     this._view = webviewView;
-
-    webviewView.webview.options = {
-      enableScripts: true,
-    };
-
+    webviewView.webview.options = { enableScripts: true };
     await this.refresh();
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
@@ -70,96 +55,197 @@ class TodoViewProvider implements vscode.WebviewViewProvider {
         editor.revealRange(new vscode.Range(pos, pos));
       } else if (message.command === 'toggleDone') {
         const key = `${message.file}:${message.line}`;
-        savedState[key] = !savedState[key];
-        await this.context.globalState.update('todoScanner.done', savedState);
-
-        if (savedState[key]) {
-          try {
-            const fileUri = vscode.Uri.file(message.file);
-            const doc = await vscode.workspace.openTextDocument(fileUri);
-            const editor = await vscode.window.showTextDocument(doc, { preview: false });
-            const targetLine = doc.lineAt(message.line - 1);
-            const lineText = targetLine.text.trim();
-
-            const isTodoLine = /^\/\/\s*(TODO|FIXME|HACK)\s*:/.test(lineText);
-            if (isTodoLine) {
-              await editor.edit(editBuilder => {
-                editBuilder.delete(targetLine.range);
-              });
-              await doc.save();
-            }
-          } catch (err) {
-            console.error('[TODO Scanner] Error al borrar el comentario:', err);
-          }
+        if (this.doneKeys.has(key)) {
+          this.doneKeys.delete(key);
+        } else {
+          this.doneKeys.add(key);
+          await deleteTodoBlock(message.file, message.line);
         }
-
+        this.saveDone();
         await this.refresh();
       }
     });
   }
 
+  private loadDone() {
+    const saved = this._state.get<string[]>('todoScanner.done') || [];
+    this.doneKeys = new Set(saved);
+  }
+
+  private saveDone() {
+    this._state.update('todoScanner.done', [...this.doneKeys]);
+  }
+
   public async refresh() {
     if (!this._view) return;
     const todos = await findTodos();
-    this._view.webview.html = getWebviewContent(todos);
+    this.cleanupDone(todos);
+    this._view.webview.html = getWebviewContent(todos, this.doneKeys);
+  }
+
+  private cleanupDone(currentTodos: TodoItem[]) {
+    const existingKeys = new Set(currentTodos.map(t => `${t.file}:${t.line}`));
+    for (const key of [...this.doneKeys]) {
+      if (!existingKeys.has(key)) {
+        this.doneKeys.delete(key);
+      }
+    }
+    this.saveDone();
   }
 }
 
 async function findTodos(): Promise<TodoItem[]> {
+  const config = vscode.workspace.getConfiguration('todoScanner');
+  const patterns = config.get<string[]>('includeFileTypes') || ['ts', 'tsx', 'js', 'jsx', 'html', 'scss', 'md', 'py'];
+  const files = await vscode.workspace.findFiles(`**/*.{${patterns.join(',')}}`, '**/{node_modules,bower_components,dist,out,build,*.map,*.min.*}/**');
+
   const todoItems: TodoItem[] = [];
-  const files = await vscode.workspace.findFiles('**/*.{ts,js,html,scss}', '**/node_modules/**');
 
   for (const file of files) {
     const content = fs.readFileSync(file.fsPath, 'utf8');
     const lines = content.split(/\r?\n/);
 
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
-      const match = line.match(/\b(TODO|FIXME|HACK)\s*:(.*)/);
-      if (match) {
-        const key = `${file.fsPath}:${index + 1}`;
-        todoItems.push({
+    let currentTodo: TodoItem | null = null;
+    let insideBlock = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      const singleLineMatch = line.match(/(\/\/|\/\*)\s*(TODO|FIXME|HACK|IDEA)\b[:\s]?(.*)/i);
+      const blockStartMatch = line.match(/\/\*\s*(TODO|FIXME|HACK|IDEA)\b[:\s]?(.*)/i);
+      const blockEndMatch = line.match(/\*\//);
+
+      if (singleLineMatch) {
+        // New single line TODO
+        if (currentTodo) {
+          todoItems.push(currentTodo);
+        }
+        currentTodo = {
           file: file.fsPath,
-          line: index + 1,
-          tag: match[1],
-          text: match[2].trim(),
-          done: savedState[key] || false
-        });
+          line: i + 1,
+          tag: singleLineMatch[2].toUpperCase(),
+          text: singleLineMatch[3]?.trim() || ''
+        };
+      } else if (blockStartMatch) {
+        // New block TODO
+        if (currentTodo) {
+          todoItems.push(currentTodo);
+        }
+        currentTodo = {
+          file: file.fsPath,
+          line: i + 1,
+          tag: blockStartMatch[1].toUpperCase(),
+          text: blockStartMatch[2]?.trim() || ''
+        };
+        insideBlock = true;
+      } else if (insideBlock) {
+        // Inside block
+        if (blockEndMatch) {
+          insideBlock = false;
+          if (currentTodo) {
+            currentTodo.text += ' ' + line.replace('*/', '').trim();
+            todoItems.push(currentTodo);
+            currentTodo = null;
+          }
+        } else {
+          if (currentTodo) {
+            currentTodo.text += ' ' + line.replace('*', '').trim();
+          }
+        }
+      } else if (currentTodo && line.trim().startsWith('//')) {
+        // Continuation of previous single-line TODO
+        currentTodo.text += ' ' + line.replace('//', '').trim();
+      } else {
+        if (currentTodo) {
+          todoItems.push(currentTodo);
+          currentTodo = null;
+        }
       }
+    }
+
+    if (currentTodo) {
+      todoItems.push(currentTodo);
     }
   }
 
   return todoItems;
 }
 
-function getWebviewContent(todos: TodoItem[]): string {
-  const grouped = todos.reduce<Record<string, TodoItem[]>>((acc, todo) => {
-    const fname = path.basename(todo.file);
-    if (!acc[fname]) acc[fname] = [];
-    acc[fname].push(todo);
-    return acc;
-  }, {});
+async function deleteTodoBlock(filePath: string, lineNumber: number) {
+  const fileUri = vscode.Uri.file(filePath);
+  const doc = await vscode.workspace.openTextDocument(fileUri);
+  const editor = await vscode.window.showTextDocument(doc, { preview: false });
 
-  const fileBlocks = Object.entries(grouped).map(([filename, items]) => {
-    const filteredItems = items
-      .map(todo => {
-        const normalizedPath = todo.file.replace(/\\/g, '/').replace(/'/g, "\\'");
-        const colorClass = todo.tag === 'TODO' ? 'todo' : todo.tag === 'FIXME' ? 'fixme' : 'hack';
-        const doneClass = todo.done ? 'done' : '';
+  await editor.edit(editBuilder => {
+    const startLine = lineNumber - 1;
+    let endLine = startLine;
 
-        return `
-          <li class="${colorClass} ${doneClass}">
-            <input type="checkbox" ${todo.done ? 'checked' : ''} onchange="toggleDone('${normalizedPath}', ${todo.line})" />
-            <a href="#" onclick="openTodo('${normalizedPath}', ${todo.line})">
-              <strong>[${todo.tag}]</strong> ${todo.text}
-              <em>(${filename}:${todo.line})</em>
-            </a>
-          </li>`;
-      })
-      .join('');
+    const firstLine = doc.lineAt(startLine).text;
 
-    return `<h4>${filename}</h4><ul>${filteredItems}</ul>`;
-  }).join('');
+    // Caso 1: Comentario de bloque /* */
+    if (firstLine.match(/\/\*\s*(TODO|FIXME|HACK|IDEA)\b/i)) {
+      for (let i = startLine; i < doc.lineCount; i++) {
+        const line = doc.lineAt(i).text;
+        if (line.match(/\*\//)) {
+          endLine = i;
+          break;
+        }
+      }
+    }
+    // Caso 2: Comentario de una o varias líneas con //
+    else if (firstLine.match(/\/\/\s*(TODO|FIXME|HACK|IDEA)\b/i)) {
+      for (let i = startLine; i < doc.lineCount; i++) {
+        const line = doc.lineAt(i).text;
+        if (i > startLine && !line.trim().startsWith('//')) {
+          endLine = i - 1;
+          break;
+        }
+        endLine = i;
+      }
+    }
+
+    // Ajustar endLine para incluir el salto de línea
+    if (endLine < doc.lineCount - 1) {
+      endLine += 1; // Incluir la línea en blanco siguiente si existe
+    } else if (endLine === doc.lineCount - 1) {
+      // Si es la última línea, asegurarse de no incluir un salto de línea adicional
+      const range = new vscode.Range(startLine, 0, endLine + 1, 0);
+      if (range.isEmpty) return;
+      editBuilder.delete(range);
+      return;
+    }
+
+    const range = new vscode.Range(startLine, 0, endLine, doc.lineAt(endLine).text.length);
+    editBuilder.delete(range);
+  });
+
+  await doc.save();
+}
+function getWebviewContent(todos: TodoItem[], doneKeys: Set<string>): string {
+  const grouped = groupByFile(todos);
+  const tags = ['TODO', 'FIXME', 'HACK', 'IDEA'];
+
+  const fileBlocks = Object.entries(grouped).map(([file, todos]) => `
+    <details open>
+      <summary style="color:#4FC3F7;">${path.basename(file)}</summary>
+      <ul>
+        ${todos.map(todo => {
+          const key = `${todo.file}:${todo.line}`;
+          const doneClass = doneKeys.has(key) ? 'done' : '';
+          const tagClass = todo.tag.toLowerCase();
+          return `
+            <li class="todo-item ${doneClass} ${tagClass}">
+              <input type="checkbox" id="todo-${key}" ${doneClass ? 'checked' : ''} onchange="toggleDone('${todo.file.replace(/\\/g, '/').replace(/'/g, "\\'")}', ${todo.line})">
+              <label for="todo-${key}">
+                <strong>[${todo.tag}]</strong> ${todo.text} <em>(línea ${todo.line})</em>
+              </label>
+              <button class="open-btn" onclick="openTodo('${todo.file.replace(/\\/g, '/').replace(/'/g, "\\'")}', ${todo.line})">🔎</button>
+            </li>
+          `;
+        }).join('')}
+      </ul>
+    </details>
+  `).join('');
 
   return `
     <!DOCTYPE html>
@@ -167,21 +253,22 @@ function getWebviewContent(todos: TodoItem[]): string {
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: sans-serif; padding: 10px; }
+        body { font-family: sans-serif; padding: 10px; background-color: #1e1e1e; color: #ccc; }
         ul { padding-left: 1em; }
         li { margin-bottom: 0.5em; list-style: none; }
         .todo strong { color: #4CAF50; }
         .fixme strong { color: #FF9800; }
         .hack strong { color: #F44336; }
+        .idea strong { color: #2196F3; }
         .done { text-decoration: line-through; opacity: 0.6; }
         em { color: #888; font-size: 0.85em; }
-        h4 { margin-top: 1em; color: #1e90ff; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
-        input[type="checkbox"] { margin-right: 0.5em; }
+        .open-btn { margin-left: 8px; background: none; border: none; color: #4FC3F7; cursor: pointer; }
       </style>
     </head>
     <body>
-      <h2>TODO Scanner</h2>
+      <h2>TODO Scanner (${todos.length})</h2>
       ${fileBlocks}
+
       <script>
         const vscode = acquireVsCodeApi();
         function openTodo(file, line) {
@@ -195,3 +282,26 @@ function getWebviewContent(todos: TodoItem[]): string {
     </html>
   `;
 }
+
+function groupByFile(todos: TodoItem[]): Record<string, TodoItem[]> {
+  const grouped: Record<string, TodoItem[]> = {};
+  for (const todo of todos) {
+    if (!grouped[todo.file]) {
+      grouped[todo.file] = [];
+    }
+    grouped[todo.file].push(todo);
+  }
+  return grouped;
+}
+
+type TodoItem = {
+  file: string;
+  line: number;
+  tag: string;
+  text: string;
+};
+
+
+
+
+

@@ -1,0 +1,11 @@
+{
+    "todoScanner.title": "Todo Scanner",
+    "todoScanner.listTitle": "Lista de TODOs",
+    "todoScanner.emptyState": "¡No se encontraron tareas! 🎉",
+    "todoScanner.filters.todo": "TODO",
+    "todoScanner.filters.fixme": "FIXME",
+    "todoScanner.filters.hack": "HACK",
+    "todoScanner.filters.idea": "IDEA",
+    "todoScanner.quickAction": "Mostrar en TODO Scanner"
+  }
+  

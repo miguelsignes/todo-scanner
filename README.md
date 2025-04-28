@@ -1,61 +1,30 @@
-# TODO Scanner 🚀
+# 📝 Todo Scanner
 
-VS Code extension to automatically scan your project for:
-
-- `// TODO:`
-- `// FIXME:`
-- `// HACK:`
-
-And display them in a beautiful sidebar panel.
+An extension for Visual Studio Code that automatically scans your project files for `TODO`, `FIXME`, `HACK`, and `IDEA` comments, displaying them grouped neatly in a sidebar view.
 
 ---
 
-## ✨ Features
+## 🚀 Features
 
-- ✅ Sidebar panel with grouped TODOs by file
-- 🎨 Color coding for `TODO`, `FIXME`, and `HACK`
-- 🔍 Click any TODO to jump to its location
-- ☑️ Mark as "done" (checkbox)
-- ✂️ Automatically deletes the TODO comment when marked as done
-- 💾 Remembers which TODOs were marked as done between sessions
-- ⚡ Auto-refreshes on file save
+- **Scans all your project files** for `TODO`, `FIXME`, `HACK`, and `IDEA` comments.
+- **Supports both single-line** (`// TODO`) **and multi-line** (`/* TODO ... */`) comments.
+- **Automatically deletes** the entire block when marking as done.
+- **Color-coded tags** for better visibility:
+  - ✅ TODO → Green
+  - 🛠️ FIXME → Orange
+  - 🐞 HACK → Red
+  - 💡 IDEA → Blue
+- **Opens the file and highlights** the comment line when clicked.
+- **Auto-excludes** unwanted files and folders like `node_modules`, `dist`, `.map`, `.min.js`, `.json`, etc.
+- **No configuration needed**: Auto-delete is enabled by default.
 
----
-
-## 📸 Preview
-
-> Coming soon...
-
----
-
-## 🔧 Usage
-
-1. Open a project with `TODO`, `FIXME`, or `HACK` comments
-2. Open the **TODO Scanner** sidebar from the Activity Bar
-3. Click to jump, check to mark as done (and auto-delete the comment!)
 
 ---
 
-## 🛠 Development
+## 🛠️ Configuration
 
-```bash
-npm install
-npm run compile
-vsce package
-code --install-extension todo-scanner-0.0.1.vsix --force
-```
-
----
-
-## 📤 Publishing (for maintainers)
-
-```bash
-vsce login <publisher>
-vsce publish patch|minor|major
-```
-
----
-
-## 📄 License
-
-MIT © Miguel Signes
+```json
+{
+  "todoScanner.autoDeleteOnDone": true,
+  "todoScanner.includeFileTypes": ["ts", "tsx", "js", "jsx", "html", "scss", "json", "md", "py"]
+}
