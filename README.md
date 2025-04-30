@@ -7,8 +7,7 @@ An extension for Visual Studio Code that automatically scans your project files 
 ## 🚀 Features
 
 - **Scans all your project files** for `TODO`, `FIXME`, `HACK`, and `IDEA` comments.
-- **Supports both single-line** (`// TODO`) **and multi-line** (`/* TODO ... */`) comments.
-- **Automatically deletes** the entire block when marking as done.
+
 - **Color-coded tags** for better visibility:
   - ✅ TODO → Green
   - 🛠️ FIXME → Orange

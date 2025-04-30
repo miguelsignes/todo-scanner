@@ -1,11 +1,18 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { TodoTreeProvider } from './TodoTreeProvider';
+import { TodoItem } from './interfaces/todo-intefaces';
 
 let viewProvider: TodoViewProvider | null = null;
+let treeProvider: TodoTreeProvider | null = null;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
+
   viewProvider = new TodoViewProvider(context.extensionUri, context.globalState);
+  treeProvider = new TodoTreeProvider();
+
+  vscode.window.registerTreeDataProvider('todoScannerTree', treeProvider);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('todoScannerView', viewProvider)
@@ -26,18 +33,21 @@ export function activate(context: vscode.ExtensionContext) {
   );
   
 
-  
+  const todos = await findTodos();
+  treeProvider.refresh(groupByFile(todos));
+
   vscode.workspace.onDidSaveTextDocument(async () => {
-    await viewProvider?.refresh();
+    const todos = await findTodos();
+    const grouped = groupByFile(todos);
+    treeProvider?.refresh(grouped); // <- esto refresca el árbol
+    await viewProvider?.refresh(); // esto actualiza el Webview
   });
 }
 
 export function deactivate() {}
 
-// TODO [HIGH] Parece que ya va
-// FIXME [LOW] ok
-// HACK [MEDIUM] Ok doki
-// IDEA [HIGH] valeee
+
+
 
 class TodoCompletionProvider implements vscode.CompletionItemProvider {
   provideCompletionItems(
@@ -327,7 +337,7 @@ function getWebviewContent(todos: TodoItem[], doneKeys: Set<string>): string {
   `;
 }
 
-// TODO 
+
 
 function groupByFile(todos: TodoItem[]): Record<string, TodoItem[]> {
   const grouped: Record<string, TodoItem[]> = {};
@@ -340,12 +350,8 @@ function groupByFile(todos: TodoItem[]): Record<string, TodoItem[]> {
   return grouped;
 }
 
-type TodoItem = {
-  file: string;
-  line: number;
-  tag: string;
-  text: string;
-};
+
+
 
 
 

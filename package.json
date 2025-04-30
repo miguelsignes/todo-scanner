@@ -33,7 +33,12 @@
           "id": "todoScannerView",
           "name": "%todoScanner.title%",
           "type": "webview"
+        },
+        {
+          "id": "todoScannerTree",
+          "name": "TODO Tree View"
         }
+
       ]
     },
     "commands": [
