@@ -17,6 +17,16 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      { language: '*' }, 
+      new TodoCompletionProvider(),
+      '[', ' ' 
+    )
+  );
+  
+
+  
   vscode.workspace.onDidSaveTextDocument(async () => {
     await viewProvider?.refresh();
   });
@@ -24,17 +34,49 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
+// TODO [HIGH] Parece que ya va
+// FIXME [LOW] ok
+// HACK [MEDIUM] Ok doki
+// IDEA [HIGH] valeee
+
+class TodoCompletionProvider implements vscode.CompletionItemProvider {
+  provideCompletionItems(
+    document: vscode.TextDocument,
+    position: vscode.Position
+  ): vscode.CompletionItem[] | undefined {
+    const line = document.lineAt(position).text;
+    if (!line.trim().match(/\/\/\s*(TODO|FIXME|HACK|IDEA)/i))
+      { return;
+      }
+    const existingTag = line.match(/\[(HIGH|MEDIUM|LOW)\]/i);
+    if (existingTag) { return;  }
+    const levels = ['[HIGH]', '[MEDIUM]', '[LOW]'];
+    return levels.map(level => {
+      const item = new vscode.CompletionItem(level, vscode.CompletionItemKind.Keyword);
+      item.insertText = `${level} `;
+      item.sortText = 'a';
+      return item;
+    });
+  }
+}
+
+
+
+
 class TodoViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _extensionUri: vscode.Uri;
   private _state: vscode.Memento;
   private doneKeys = new Set<string>();
 
+  
+
   constructor(extensionUri: vscode.Uri, globalState: vscode.Memento) {
     this._extensionUri = extensionUri;
     this._state = globalState;
     this.loadDone();
   }
+
 
   public async resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -77,7 +119,7 @@ class TodoViewProvider implements vscode.WebviewViewProvider {
   }
 
   public async refresh() {
-    if (!this._view) return;
+    if (!this._view) { return; } 
     const todos = await findTodos();
     this.cleanupDone(todos);
     this._view.webview.html = getWebviewContent(todos, this.doneKeys);
@@ -182,7 +224,7 @@ async function deleteTodoBlock(filePath: string, lineNumber: number) {
 
     const firstLine = doc.lineAt(startLine).text;
 
-    // Caso 1: Comentario de bloque /* */
+
     if (firstLine.match(/\/\*\s*(TODO|FIXME|HACK|IDEA)\b/i)) {
       for (let i = startLine; i < doc.lineCount; i++) {
         const line = doc.lineAt(i).text;
@@ -192,7 +234,7 @@ async function deleteTodoBlock(filePath: string, lineNumber: number) {
         }
       }
     }
-    // Caso 2: Comentario de una o varias líneas con //
+
     else if (firstLine.match(/\/\/\s*(TODO|FIXME|HACK|IDEA)\b/i)) {
       for (let i = startLine; i < doc.lineCount; i++) {
         const line = doc.lineAt(i).text;
@@ -204,13 +246,15 @@ async function deleteTodoBlock(filePath: string, lineNumber: number) {
       }
     }
 
-    // Ajustar endLine para incluir el salto de línea
+
     if (endLine < doc.lineCount - 1) {
-      endLine += 1; // Incluir la línea en blanco siguiente si existe
+      endLine += 1; 
     } else if (endLine === doc.lineCount - 1) {
-      // Si es la última línea, asegurarse de no incluir un salto de línea adicional
+
       const range = new vscode.Range(startLine, 0, endLine + 1, 0);
-      if (range.isEmpty) return;
+      if (range.isEmpty) {
+        return;
+      } 
       editBuilder.delete(range);
       return;
     }
@@ -282,6 +326,8 @@ function getWebviewContent(todos: TodoItem[], doneKeys: Set<string>): string {
     </html>
   `;
 }
+
+// TODO 
 
 function groupByFile(todos: TodoItem[]): Record<string, TodoItem[]> {
   const grouped: Record<string, TodoItem[]> = {};

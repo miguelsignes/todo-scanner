@@ -3,7 +3,7 @@
   "displayName": "%todoScanner.title%",
   "description": "Scan and manage TODO, FIXME, HACK, and IDEA comments efficiently.",
   "publisher": "miguelsignes",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "engines": {
     "vscode": "^1.99.0"
   },
@@ -41,7 +41,17 @@
         "command": "todoScanner.showTodos",
         "title": "%todoScanner.listTitle%"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "TODO Scanner",
+      "properties": {
+        "todoScanner.priorityTags": {
+          "type": "array",
+          "description": "Custom tags for TODO autocomplete (e.g. [HIGH], [MEDIUM])",
+          "default": ["[HIGH]", "[MEDIUM]", "[LOW]"]
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
