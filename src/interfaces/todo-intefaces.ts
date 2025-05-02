@@ -10,7 +10,7 @@ export class TodoItemTree extends vscode.TreeItem {
     tooltipText?: string
   ) {
     super(label, collapsibleState);
-    this.tooltip = tooltipText || label; // Aquí va el texto del tooltip
+    this.tooltip = tooltipText || label; 
     this.command = line !== undefined ? {
       command: 'vscode.open',
       title: 'Open TODO',
