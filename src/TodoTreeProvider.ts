@@ -30,14 +30,15 @@ export class TodoTreeProvider implements vscode.TreeDataProvider<TodoItemTree> {
       const todos = Object.entries(this.todosByFile)
         .find(([key]) => path.resolve(key) === path.resolve(element.resourceUri?.fsPath || ''))?.[1] || [];
   
-      return Promise.resolve(
-        todos.map(todo => new TodoItemTree(
-          `[${todo.tag}] ${todo.text}`,
-          vscode.TreeItemCollapsibleState.None,
-          vscode.Uri.file(todo.file),
-          todo.line
-        ))
-      );
+        return Promise.resolve(
+          todos.map(todo => new TodoItemTree(
+            `[${todo.tag}] ${todo.text}`,
+            vscode.TreeItemCollapsibleState.None,
+            vscode.Uri.file(todo.file),
+            todo.line,
+            `File: ${path.basename(todo.file)}\nLine: ${todo.line}\n${todo.text}`
+          ))
+        );
     }
   }
   

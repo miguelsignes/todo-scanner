@@ -39,8 +39,8 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.workspace.onDidSaveTextDocument(async () => {
     const todos = await findTodos();
     const grouped = groupByFile(todos);
-    treeProvider?.refresh(grouped); // <- esto refresca el árbol
-    await viewProvider?.refresh(); // esto actualiza el Webview
+    treeProvider?.refresh(grouped); 
+    await viewProvider?.refresh(); 
   });
 }
 
@@ -146,6 +146,8 @@ class TodoViewProvider implements vscode.WebviewViewProvider {
   }
 }
 
+
+
 async function findTodos(): Promise<TodoItem[]> {
   const config = vscode.workspace.getConfiguration('todoScanner');
   const patterns = config.get<string[]>('includeFileTypes') || ['ts', 'tsx', 'js', 'jsx', 'html', 'scss', 'md', 'py'];
@@ -168,7 +170,7 @@ async function findTodos(): Promise<TodoItem[]> {
       const blockEndMatch = line.match(/\*\//);
 
       if (singleLineMatch) {
-        // New single line TODO
+      
         if (currentTodo) {
           todoItems.push(currentTodo);
         }
@@ -179,7 +181,7 @@ async function findTodos(): Promise<TodoItem[]> {
           text: singleLineMatch[3]?.trim() || ''
         };
       } else if (blockStartMatch) {
-        // New block TODO
+
         if (currentTodo) {
           todoItems.push(currentTodo);
         }
@@ -191,7 +193,7 @@ async function findTodos(): Promise<TodoItem[]> {
         };
         insideBlock = true;
       } else if (insideBlock) {
-        // Inside block
+
         if (blockEndMatch) {
           insideBlock = false;
           if (currentTodo) {
@@ -205,7 +207,7 @@ async function findTodos(): Promise<TodoItem[]> {
           }
         }
       } else if (currentTodo && line.trim().startsWith('//')) {
-        // Continuation of previous single-line TODO
+
         currentTodo.text += ' ' + line.replace('//', '').trim();
       } else {
         if (currentTodo) {
